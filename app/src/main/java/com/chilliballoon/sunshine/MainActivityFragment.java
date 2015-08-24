@@ -1,17 +1,20 @@
 package com.chilliballoon.sunshine;
 
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.text.format.Time;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
@@ -48,14 +51,25 @@ public class MainActivityFragment extends Fragment {
                              Bundle savedInstanceState) {
         View v = inflater.inflate(R.layout.fragment_main, container, false);
 
-        ArrayList<String> fakeForecast = new ArrayList<>();
-        fakeForecast.add("Today - Sunny 88/63");
+        mForecastAdapter = new ArrayAdapter<>(getActivity(), R.layout.list_item_forecast, R.id.list_item_forecast_textview, new ArrayList<String>());
 
-        mForecastAdapter = new ArrayAdapter<>(getActivity(), R.layout.list_item_forecast, R.id.list_item_forecast_textview, fakeForecast);
         ListView listView = (ListView) v.findViewById(R.id.listview_forecast);
         listView.setAdapter(mForecastAdapter);
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                Intent detailIntent = new Intent (getActivity().getBaseContext(), DetailActivity.class).putExtra(Intent.EXTRA_TEXT, mForecastAdapter.getItem(position));
+                getActivity().startActivity(detailIntent);
+            }
+        });
 
         return v;
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        updateWeather();
     }
 
     @Override
@@ -68,8 +82,7 @@ public class MainActivityFragment extends Fragment {
     public boolean onOptionsItemSelected(MenuItem item){
         int id = item.getItemId();
         if (id == R.id.action_refresh){
-            FetchWeatherTask weatherTask = new FetchWeatherTask();
-            weatherTask.execute("HK");
+            updateWeather();
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -92,7 +105,6 @@ public class MainActivityFragment extends Fragment {
             // Will contain the raw JSON response as a string.
             String forecastJsonStr = null;
             String format = "json";
-            String units = "metric";
             int numDays = 7;
             String[] forecastData = null;
 
@@ -110,7 +122,7 @@ public class MainActivityFragment extends Fragment {
                 Uri builtUri = Uri.parse(FORECAST_BASE_URL).buildUpon()
                         .appendQueryParameter(QUERY_PARAM, params[0])
                         .appendQueryParameter(FORMAT_PARAM, format)
-                        .appendQueryParameter(UNITS_PARAM, units)
+                        .appendQueryParameter(UNITS_PARAM, params[1])
                         .appendQueryParameter(DAYS_PARAM, Integer.toString(numDays))
                         .build();
 
@@ -170,7 +182,6 @@ public class MainActivityFragment extends Fragment {
                 mForecastAdapter.clear();
                 for (String dayForecastStr : result){
                     mForecastAdapter.add(dayForecastStr);
-                    Log.e("onPostExecute", "Log9ged");
                 }
             }
         }
@@ -272,4 +283,14 @@ public class MainActivityFragment extends Fragment {
         }
 
     }
+
+    private void updateWeather(){
+        FetchWeatherTask weatherTask = new FetchWeatherTask();
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
+        String areaCode = prefs.getString(getResources().getString(R.string.pref_location_key), getResources().getString(R.string.pref_location_default));
+        String units = prefs.getString(getResources().getString(R.string.pref_units_key), getResources().getString(R.string.pref_units_default));
+        weatherTask.execute(areaCode, units);
+
+    }
+
 }
